@@ -1,0 +1,178 @@
+---
+title: "p8105_hw2_pl2811"
+author: "Pei Hsin Lin"
+date: "10/9/2021"
+output: html_document
+---
+```{r}
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(ggridges)
+library(lubridate)
+```
+
+```{r}
+###Problem 1
+#Read and clean the Mr. Trash Wheel sheet
+trash_wheel<-read_excel("/Users/lin/Desktop/Trash-Wheel-Collection-Totals-7-2020-2.xlsx", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0)
+names(trash_wheel)
+trash_wheel= janitor::clean_names(trash_wheel)
+names(trash_wheel)
+skimr::skim(trash_wheel)
+trash_wheel= subset(trash_wheel, select = -c(x15,x16,x17) )
+trash_wheel<- na.omit(trash_wheel)
+
+#round sports balls to the nearest integer
+  trash_wheel %>%
+pull(sports_balls)%>%
+round()
+
+#Read and clean precipitation data for 2018 
+precipitation_2018<-read_excel("/Users/lin/Desktop/Trash-Wheel-Collection-Totals-7-2020-2.xlsx", sheet = "2018 Precipitation", col_names = TRUE, col_types = NULL, na = "", skip = 1)
+precipitation_2018<- na.omit(precipitation_2018)
+#add a variable for year. 
+precipitation_2018<- precipitation_2018 %>%
+  add_column(year = "2018")
+#combine datasets,  convert month to a character variable 
+month<-month.name[precipitation_2018$Month]
+precipitation_2018<- precipitation_2018 %>%
+add_column(month)
+precipitation_2018= subset(precipitation_2018, select = -c(Month))
+precipitation_2018<- precipitation_2018[c("year", "month", "Total")]
+precipitation_2018 %>%
+pull(Total)%>%
+sum()
+#Read and clean precipitation data for 2019
+precipitation_2019<-read_excel("/Users/lin/Desktop/Trash-Wheel-Collection-Totals-7-2020-2.xlsx", sheet = "2019 Precipitation", col_names = TRUE, col_types = NULL, na = "", skip = 1)
+precipitation_2019<- na.omit(precipitation_2019)
+#add a variable for year.
+precipitation_2019<- precipitation_2019 %>%
+  add_column(year = "2019")
+#combine datasets,  convert month to a character variable  
+month<-month.name[precipitation_2019$Month]
+precipitation_2019<- precipitation_2019 %>%
+add_column(month)
+precipitation_2019= subset(precipitation_2019, select = -c(Month))
+precipitation_2019<- precipitation_2019[c("year", "month", "Total")]
+summary(precipitation_2019)
+balls_19=subset(trash_wheel, select = c(sports_balls, year))
+
+balls_19<-filter(balls_19,year == 2019)
+summary(balls_19)
+
+```
+
+Mr. Trash Wheel sheet has 453 observations, precipitation data for 2018 has 12 observations,precipitation data for 2019 has 12 observations.
+Total precipitation in 2018 is 70.33, median number of sports balls in a dumpster in 2019 is 9.
+
+
+###Problem 2
+
+```{r}
+
+#clean the data, break up the variable,
+pols_month<- read.csv(file ="/Users/lin/Desktop/fivethirtyeight_datasets/pols-month.csv")
+pols_month<- pols_month %>%
+    separate(mon, c("year", "Month", "day"), sep="-")
+#replace month number with month name
+pols_month$Month <- as.numeric(as.character(pols_month$Month ))
+month<-month.name[pols_month$Month]
+pols_month<- pols_month %>%
+add_column(month)
+pols_month= subset(pols_month, select = -c(Month))
+###create variable, remove the day variable.
+pols_month= 
+  pivot_longer(
+    pols_month, 
+    starts_with("prez"),
+    names_to = "president", 
+    names_prefix = "prez_",
+    values_to = "prez")
+pols_month= subset(pols_month, select = -c(day))
+
+```
+
+```{R}
+###clean the data using a similar process to the above
+snp<- read.csv(file ="/Users/lin/Desktop/fivethirtyeight_datasets/snp.csv")
+snp_y<- mdy(snp$date)
+foo <- function(x, year=1968){
+  m <- year(x) %% 100
+  year(x) <- ifelse(m > year %% 100, 1900+m, 2000+m)
+  x
+}
+Date<-foo(snp_y, 1949)
+snp<- snp %>%
+add_column(Date)
+snp= subset(snp, select = -c(date))
+snp<- snp %>%
+    separate(Date, c("year", "Month", "day"), sep="-")
+snp= subset(snp, select = -c(day))
+snp$Month <- as.numeric(as.character(snp$Month ))
+month<-month.name[snp$Month]
+snp<- snp %>%
+add_column(month)
+snp= subset(snp, select = -c(Month))
+###organize so that year and month are the leading columns
+snp<- snp[c("year", "month", "close")]
+```
+
+```{r}
+###tidy the unemployment data, merge datasets
+unemployment<-read.csv(file ="/Users/lin/Desktop/fivethirtyeight_datasets/unemployment.csv")
+unemployment <- unemployment%>% rename( January = Jan, February=Feb, March=Mar,April=Apr, June=Jun, July=Jul,  August=Aug, September=Sep, October=Oct, November=Nov,December=Dec)
+unemployment<- gather(unemployment, month, unemployment,January:December, factor_key=TRUE)
+unemployment
+unemployment<-janitor::clean_names(unemployment)
+snp<-janitor::clean_names(snp)
+pols_month<-janitor::clean_names(pols_month)
+###merging snp into pols, and merging unemployment
+total <- merge(pols_month,snp,by=c("year","month"))
+total <- merge(total,unemployment, by=c("year","month"))
+```
+Write a short paragraph about these datasets. Explain briefly what each dataset contained, and describe the resulting dataset (e.g. give the dimension, range of years, and names of key variables).
+```{r}
+###Problem 3
+#Load and tidy the data
+Popular_Baby_Names<-read.csv(file ="/Users/lin/Desktop/Popular_Baby_Names.csv")
+Popular_Baby_Names<-Popular_Baby_Names[!duplicated(Popular_Baby_Names), ]
+Popular_Baby_Names<-janitor::clean_names(Popular_Baby_Names)
+
+###Produce table showing the rank in popularity of the name “Olivia” 
+Olivia<-filter(Popular_Baby_Names, child_s_first_name == "Olivia")
+Olivia= subset(Olivia, select = -c(gender,child_s_first_name,count))
+Olivia<-Olivia %>%
+  pivot_wider( names_from = ethnicity, 
+  values_from = rank)
+Olivia<-arrange(Olivia,year_of_birth)
+Olivia<-janitor::clean_names(Olivia)
+Olivia
+#Producetable showing the most popular name among male children over time.
+p_male<-filter(Popular_Baby_Names,gender == "MALE")
+p_male<-filter(p_male,rank ==1)
+p_male=subset(p_male, select = -c(gender,count,rank))
+p_male<-p_male%>%
+  pivot_wider( names_from = ethnicity, 
+  values_from =child_s_first_name)
+p_male<-janitor::clean_names(p_male)
+p_male$asian_and_pacific_islander<- coalesce( p_male$asian_and_pacific_islander,  p_male$asian_and_paci)
+p_male$ black_non_hispanic<- coalesce( p_male$ black_non_hispanic,  p_male$ black_non_hisp)
+p_male$white_non_hispanic<- coalesce( p_male$white_non_hispanic,  p_male$white_non_hisp)
+p_male=subset(p_male, select = c(year_of_birth ,asian_and_pacific_islander,black_non_hispanic,white_non_hispanic,hispanic))
+p_male<-arrange(p_male, year_of_birth)
+p_male
+###f produce a scatter plot showing the number of children with a name against the rank in popularity of that name
+
+mw16<-filter(Popular_Baby_Names,gender == "MALE" &  year_of_birth == 2016)
+mw16<-filter(mw16,ethnicity=="WHITE NON HISPANIC"|ethnicity=="WHITE NON HISP")
+
+              
+mw16_plot<-ggplot(mw16, aes(x = rank, y = count)) + 
+    geom_point()
+mw16_plot
+
+```
+
+
+
